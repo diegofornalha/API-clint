@@ -55,10 +55,10 @@ def check_connection():
                 if "value" in qr_data:
                     logger.info("\n✅ QR Code obtido com sucesso!")
                     logger.info("\nPara conectar:")
-                    logger.info("1. Abra o WhatsApp no seu celular")
-                    logger.info("2. Toque em Menu ou Configurações e selecione WhatsApp Web")
-                    logger.info("3. Aponte seu celular para este QR Code:")
-                    logger.info(f"\n{qr_data['value']}")
+                    logger.info("1. Acesse https://app.z-api.io")
+                    logger.info("2. Localize sua instância")
+                    logger.info("3. Faça a conexão pelo site")
+                    logger.info("4. Use o número 21936182339")
                 else:
                     logger.error("\n❌ QR Code não disponível na resposta")
             else:

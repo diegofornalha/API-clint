@@ -45,9 +45,8 @@ def restart_connection():
                 logger.info("\nPróximos passos:")
                 logger.info("1. Acesse https://app.z-api.io")
                 logger.info("2. Localize sua instância")
-                logger.info("3. Aguarde o QR Code aparecer")
-                logger.info("4. Escaneie o QR Code com o WhatsApp")
-                logger.info("5. Use o número 21936182339")
+                logger.info("3. Faça a conexão pelo site")
+                logger.info("4. Use o número 21936182339")
             else:
                 logger.error(f"\n❌ Erro ao verificar status após reinicialização: {status_response.text}")
         else:

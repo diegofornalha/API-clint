@@ -9,7 +9,7 @@ logger = APILogger('test_message')
 INSTANCE_ID = '3DCC625CC314A038C87896155CBF9532'
 TOKEN = '378F94E0EAC7F1CDFFB85BC4'
 SECURITY_TOKEN = 'F0a93697fc543427aae97a54d8f03ed99S'
-DEFAULT_CLIENT_NUMBER = '21998567176'
+DEFAULT_CLIENT_NUMBER = '21936182339'  # Updated to the correct client number
 
 def main():
     # Criando cliente Z-API
@@ -49,4 +49,4 @@ def main():
         logger.error(f'❌ Erro: {str(e)}')
 
 if __name__ == '__main__':
-    main() 
+    main()

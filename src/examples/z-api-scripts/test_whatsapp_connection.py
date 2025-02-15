@@ -39,18 +39,21 @@ def main():
                 logger.info("✅ WhatsApp está conectado!")
                 return
             else:
-                logger.warning("❌ WhatsApp não está conectado!")
-                if tentativa < 2:  # Se não for a última tentativa
-                    logger.info("Aguardando 5 segundos antes da próxima tentativa...")
-                    time.sleep(5)
+                logger.error("\n❌ WhatsApp não está conectado!")
+                logger.info("\nPara conectar:")
+                logger.info("1. Acesse https://app.z-api.io")
+                logger.info("2. Localize sua instância")
+                logger.info("3. Faça a conexão pelo site")
+                logger.info("4. Use o número 21936182339")
+                return
         
         # Se chegou aqui, todas as tentativas falharam
         logger.error("\nNão foi possível conectar após 3 tentativas!")
         logger.info("\nPara conectar:")
         logger.info("1. Acesse https://app.z-api.io")
         logger.info("2. Localize sua instância")
-        logger.info("3. Escaneie o QR Code com o WhatsApp")
-        logger.info(f"4. Use o número {Config.ZAPI_SENDER_NUMBER}")
+        logger.info("3. Faça a conexão pelo site")
+        logger.info("4. Use o número 21936182339")
         
     except Exception as e:
         logger.error(f"Erro ao testar conexão: {str(e)}")

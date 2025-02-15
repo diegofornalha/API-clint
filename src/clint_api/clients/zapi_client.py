@@ -43,6 +43,30 @@ class ZAPIClient:
             raise ClintAPIException(f"Resposta inválida da API: {str(e)}")
     
     @retry(max_attempts=3, delay=1.0)
+    @log_api_call("zapi_restart_connection")
+    def restart_connection(self) -> bool:
+        """Reinicia a conexão com o WhatsApp"""
+        url = self._get_url("restart")
+        
+        try:
+            logger.info("Reiniciando conexão com o WhatsApp...")
+            response = requests.post(url, headers=self.headers)
+            
+            logger.debug(f"Status code: {response.status_code}")
+            logger.debug(f"Resposta: {response.text}")
+            
+            if response.status_code in [200, 201]:
+                logger.info("Conexão reiniciada com sucesso!")
+                return True
+            else:
+                logger.error(f"Erro ao reiniciar conexão: {response.text}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Erro ao reiniciar conexão: {str(e)}")
+            return False
+    
+    @retry(max_attempts=3, delay=1.0)
     @log_api_call("zapi_connection_status")
     def is_connected(self) -> bool:
         """Verifica se está conectado ao WhatsApp"""
@@ -89,8 +113,8 @@ class ZAPIClient:
         payload = {
             "phone": api_phone,
             "message": message.message,
-            "delayMessage": 2,  # 2 segundos de delay
-            "delayTyping": 3    # 3 segundos "digitando"
+            "delayMessage": max(2, len(message.message) // 20),  # Delay baseado no tamanho da mensagem
+            "delayTyping": max(3, len(message.message) // 15)    # Tempo digitando proporcional ao tamanho
         }
         
         # Adiciona parâmetros de mídia se necessário
@@ -127,4 +151,4 @@ class ZAPIClient:
                 
         except Exception as e:
             logger.error(f"Erro ao enviar mensagem: {str(e)}")
-            return None 
+            return None
