@@ -37,6 +37,24 @@ class Config:
         'secondary': os.getenv('TEST_NUMBER_SECONDARY', '')
     }
     
+    # Webhook settings
+    WEBHOOK_BASE_URL: str = os.getenv('WEBHOOK_BASE_URL', '')
+    WEBHOOK_PORT: int = int(os.getenv('WEBHOOK_PORT', '8000'))
+    
+    # Ngrok
+    NGROK_AUTHTOKEN: str = os.getenv('NGROK_AUTHTOKEN', '')
+    
+    # URLs de mídia para testes
+    MEDIA_URLS = {
+        'audio': os.getenv('TEST_AUDIO_URL', 'https://freetestdata.com/wp-content/uploads/2021/09/Free_Test_Data_100KB_MP3.mp3'),
+        'video': os.getenv('TEST_VIDEO_URL', 'https://www.learningcontainer.com/wp-content/uploads/2020/05/sample-mp4-file.mp4'),
+        'image': os.getenv('TEST_IMAGE_URL', 'https://www.learningcontainer.com/wp-content/uploads/2020/07/Sample-JPEG-Image-File-Download-scaled.jpg'),
+        'document': os.getenv('TEST_DOCUMENT_URL', 'https://www.learningcontainer.com/wp-content/uploads/2019/09/sample-pdf-file.pdf')
+    }
+    
+    # Caminhos de arquivos
+    AUDIO_TEST_PATH: str = os.getenv('AUDIO_TEST_PATH', '')
+    
     @classmethod
     def validate(cls) -> Optional[str]:
         """
@@ -72,6 +90,11 @@ class Config:
         for key, value in config_dict.items():
             if hasattr(cls, key):
                 setattr(cls, key, value)
+                os.environ[key] = value
+            elif key.startswith('TEST_') and key.endswith('_URL'):
+                # Atualiza URLs de mídia
+                media_key = key.replace('TEST_', '').replace('_URL', '').lower()
+                cls.MEDIA_URLS[media_key] = value
                 os.environ[key] = value
 
 def encode_audio_to_base64(audio_path: str) -> str:
@@ -215,14 +238,67 @@ def load_env_to_session():
     """Carrega as variáveis de ambiente para a sessão do Streamlit"""
     if not hasattr(st.session_state, 'config'):
         st.session_state.config = {
+            # Z-API
             'ZAPI_INSTANCE_ID': Config.ZAPI_INSTANCE_ID,
             'ZAPI_TOKEN': Config.ZAPI_TOKEN,
             'ZAPI_SECURITY_TOKEN': Config.ZAPI_SECURITY_TOKEN,
+            
+            # WhatsApp Numbers
             'ZAPI_SENDER_NUMBER': Config.ZAPI_SENDER_NUMBER,
             'DEFAULT_CLIENT_NUMBER': Config.DEFAULT_CLIENT_NUMBER,
             'TEST_NUMBER_PRIMARY': Config.TEST_NUMBERS.get('primary', ''),
-            'TEST_NUMBER_SECONDARY': Config.TEST_NUMBERS.get('secondary', '')
+            'TEST_NUMBER_SECONDARY': Config.TEST_NUMBERS.get('secondary', ''),
+            
+            # Clint API
+            'CLINT_API_TOKEN': Config.CLINT_API_TOKEN,
+            
+            # Webhook
+            'WEBHOOK_BASE_URL': Config.WEBHOOK_BASE_URL,
+            'WEBHOOK_PORT': str(Config.WEBHOOK_PORT),
+            
+            # Ngrok
+            'NGROK_AUTHTOKEN': Config.NGROK_AUTHTOKEN,
+            
+            # Caminhos
+            'AUDIO_TEST_PATH': Config.AUDIO_TEST_PATH,
+            
+            # Mídia
+            'TEST_AUDIO_URL': Config.MEDIA_URLS.get('audio', ''),
+            'TEST_VIDEO_URL': Config.MEDIA_URLS.get('video', ''),
+            'TEST_IMAGE_URL': Config.MEDIA_URLS.get('image', ''),
+            'TEST_DOCUMENT_URL': Config.MEDIA_URLS.get('document', '')
         }
+
+def test_api_connection():
+    """Testa a conexão com a API Z-API"""
+    try:
+        error = Config.validate()
+        if error:
+            return {"status": "error", "message": error}
+        
+        # URL para testar conexão
+        url = f"{Config.get_zapi_base_url()}/connection"
+        
+        # Headers
+        headers = {
+            "Client-Token": Config.ZAPI_SECURITY_TOKEN,
+            "Content-Type": "application/json"
+        }
+        
+        # Faz a requisição
+        response = requests.get(url, headers=headers)
+        
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("connected"):
+                return {"status": "success", "message": "Conectado ao WhatsApp"}
+            else:
+                return {"status": "warning", "message": "Z-API conectado, mas desconectado do WhatsApp"}
+        else:
+            return {"status": "error", "message": f"Erro ao verificar conexão: {response.text}"}
+            
+    except Exception as e:
+        return {"status": "error", "message": f"Erro ao testar conexão: {str(e)}"}
 
 # Configuração da página
 st.set_page_config(
@@ -238,24 +314,176 @@ load_env_to_session()
 with st.sidebar:
     st.title("⚙️ Configurações")
     
-    # Expander para configurações da API
-    with st.expander("Configuração da API Z-API"):
-        st.caption("Configure suas credenciais da Z-API")
+    # Expander para configurações essenciais da Z-API
+    with st.expander("Configuração da API Z-API", expanded=True):
+        st.caption("Configure suas credenciais da Z-API (obrigatório)")
         
-        # Campos de configuração
-        instance_id = st.text_input("Instance ID", value=st.session_state.config.get('ZAPI_INSTANCE_ID', ''), key="config_instance_id")
-        token = st.text_input("Token", value=st.session_state.config.get('ZAPI_TOKEN', ''), key="config_token")
-        security_token = st.text_input("Security Token", value=st.session_state.config.get('ZAPI_SECURITY_TOKEN', ''), type="password", key="config_security_token")
-        sender_number = st.text_input("Número do Remetente", value=st.session_state.config.get('ZAPI_SENDER_NUMBER', ''), key="config_sender")
+        # Campos de configuração essenciais
+        instance_id = st.text_input(
+            "Instance ID *", 
+            value=st.session_state.config.get('ZAPI_INSTANCE_ID', ''),
+            help="ID da instância na Z-API",
+            key="config_instance_id"
+        )
         
-        # Botão para salvar configuração
-        if st.button("💾 Salvar Configuração"):
+        token = st.text_input(
+            "Token *", 
+            value=st.session_state.config.get('ZAPI_TOKEN', ''),
+            help="Token da API Z-API",
+            key="config_token"
+        )
+        
+        security_token = st.text_input(
+            "Security Token *", 
+            value=st.session_state.config.get('ZAPI_SECURITY_TOKEN', ''),
+            type="password",
+            help="Token de segurança da Z-API",
+            key="config_security_token"
+        )
+        
+        st.markdown("**\* Campos obrigatórios**")
+    
+    # Expander para números de telefone
+    with st.expander("Números de WhatsApp"):
+        st.caption("Configure os números de telefone para envio e testes")
+        
+        sender_number = st.text_input(
+            "Número do Remetente", 
+            value=st.session_state.config.get('ZAPI_SENDER_NUMBER', ''),
+            help="Número que envia as mensagens (ex: 5521999999999)",
+            key="config_sender"
+        )
+        
+        default_client = st.text_input(
+            "Número do Cliente Padrão", 
+            value=st.session_state.config.get('DEFAULT_CLIENT_NUMBER', ''),
+            help="Número padrão do cliente (ex: 5521999999999)",
+            key="config_default_client"
+        )
+        
+        test_primary = st.text_input(
+            "Número de Teste Principal", 
+            value=st.session_state.config.get('TEST_NUMBER_PRIMARY', ''),
+            help="Número para testes (ex: 5521999999999)",
+            key="config_test_primary"
+        )
+        
+        test_secondary = st.text_input(
+            "Número de Teste Secundário", 
+            value=st.session_state.config.get('TEST_NUMBER_SECONDARY', ''),
+            help="Número alternativo para testes",
+            key="config_test_secondary"
+        )
+    
+    # Expander para configuração da Clint API
+    with st.expander("Configuração da Clint API"):
+        st.caption("Configure as credenciais da Clint API")
+        
+        clint_token = st.text_input(
+            "Token da Clint API", 
+            value=st.session_state.config.get('CLINT_API_TOKEN', ''),
+            help="Token de acesso à API Clint",
+            key="config_clint_token"
+        )
+    
+    # Expander para configurações avançadas
+    with st.expander("Configurações Avançadas"):
+        st.caption("Configurações para webhook e túnel")
+        
+        webhook_url = st.text_input(
+            "URL Base do Webhook", 
+            value=st.session_state.config.get('WEBHOOK_BASE_URL', ''),
+            help="URL base para webhooks (sem barra no final)",
+            key="config_webhook_url"
+        )
+        
+        webhook_port = st.text_input(
+            "Porta do Webhook", 
+            value=st.session_state.config.get('WEBHOOK_PORT', '8000'),
+            help="Porta para o servidor webhook",
+            key="config_webhook_port"
+        )
+        
+        ngrok_token = st.text_input(
+            "Ngrok AuthToken", 
+            value=st.session_state.config.get('NGROK_AUTHTOKEN', ''),
+            help="Token de autenticação do Ngrok para exposição de webhooks",
+            key="config_ngrok_token"
+        )
+    
+    # Expander para URLs de mídia para testes
+    with st.expander("URLs de Mídia para Testes"):
+        st.caption("URLs para arquivos de mídia usados em testes")
+        
+        audio_url = st.text_input(
+            "URL de Áudio", 
+            value=st.session_state.config.get('TEST_AUDIO_URL', ''),
+            help="URL para arquivo de áudio de teste",
+            key="config_audio_url"
+        )
+        
+        video_url = st.text_input(
+            "URL de Vídeo", 
+            value=st.session_state.config.get('TEST_VIDEO_URL', ''),
+            help="URL para arquivo de vídeo de teste",
+            key="config_video_url"
+        )
+        
+        image_url = st.text_input(
+            "URL de Imagem", 
+            value=st.session_state.config.get('TEST_IMAGE_URL', ''),
+            help="URL para arquivo de imagem de teste",
+            key="config_image_url"
+        )
+        
+        document_url = st.text_input(
+            "URL de Documento", 
+            value=st.session_state.config.get('TEST_DOCUMENT_URL', ''),
+            help="URL para arquivo de documento de teste",
+            key="config_document_url"
+        )
+        
+        audio_path = st.text_input(
+            "Caminho de Áudio Local", 
+            value=st.session_state.config.get('AUDIO_TEST_PATH', ''),
+            help="Caminho completo para um arquivo de áudio local para testes",
+            key="config_audio_path"
+        )
+    
+    # Botão para salvar configuração
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if st.button("💾 Salvar Configuração", type="primary"):
             # Atualiza a sessão
             config_data = {
+                # Z-API
                 'ZAPI_INSTANCE_ID': instance_id,
                 'ZAPI_TOKEN': token,
                 'ZAPI_SECURITY_TOKEN': security_token,
-                'ZAPI_SENDER_NUMBER': sender_number
+                
+                # WhatsApp Numbers
+                'ZAPI_SENDER_NUMBER': sender_number,
+                'DEFAULT_CLIENT_NUMBER': default_client,
+                'TEST_NUMBER_PRIMARY': test_primary,
+                'TEST_NUMBER_SECONDARY': test_secondary,
+                
+                # Clint API
+                'CLINT_API_TOKEN': clint_token,
+                
+                # Webhook
+                'WEBHOOK_BASE_URL': webhook_url,
+                'WEBHOOK_PORT': webhook_port,
+                
+                # Ngrok
+                'NGROK_AUTHTOKEN': ngrok_token,
+                
+                # Mídia
+                'TEST_AUDIO_URL': audio_url,
+                'TEST_VIDEO_URL': video_url,
+                'TEST_IMAGE_URL': image_url,
+                'TEST_DOCUMENT_URL': document_url,
+                'AUDIO_TEST_PATH': audio_path
             }
             
             # Atualiza a sessão e o objeto Config
@@ -267,6 +495,18 @@ with st.sidebar:
                 st.success("✅ Configuração salva com sucesso!")
             else:
                 st.error("❌ Erro ao salvar configuração!")
+    
+    with col2:
+        if st.button("🔄 Testar Conexão"):
+            # Testa a conexão com a API
+            result = test_api_connection()
+            
+            if result["status"] == "success":
+                st.success(result["message"])
+            elif result["status"] == "warning":
+                st.warning(result["message"])
+            else:
+                st.error(result["message"])
 
 # Título e descrição principal
 st.title("🎵 Envio de Áudio via WhatsApp")
