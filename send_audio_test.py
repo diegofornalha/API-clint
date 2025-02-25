@@ -1,36 +1,34 @@
 import os
-import base64
 import requests
+import json
+import base64
 from clint_api.utils.logger import APILogger
+from clint_api.utils.config import Config
+from clint_api.utils.zapi_helpers import encode_media_to_base64
 
 # Configura o logger
 logger = APILogger("send_audio_test")
 
-def encode_audio_to_base64(audio_path: str) -> str:
-    """Converte um arquivo de áudio para base64"""
-    try:
-        with open(audio_path, 'rb') as audio_file:
-            encoded_string = base64.b64encode(audio_file.read()).decode('utf-8')
-            return f"data:audio/mp3;base64,{encoded_string}"
-    except Exception as e:
-        logger.error(f"❌ Erro ao codificar áudio: {str(e)}")
-        return None
+def encode_audio_to_base64(file_path: str) -> str:
+    """Codifica um arquivo de áudio para base64"""
+    return encode_media_to_base64(file_path)
 
 def main():
     """Função principal"""
-    # Configurações da Z-API
-    INSTANCE_ID = "3DCC625CC314A038C87896155CBF9532"
-    TOKEN = "378F94E0EAC7F1CDFFB85BC4"
-    SECURITY_TOKEN = "F0a93697fc543427aae97a54d8f03ed99S"
+    # Verifica se a configuração é válida
+    error = Config.validate()
+    if error:
+        logger.error(f"❌ Erro de configuração: {error}")
+        return
     
     # URL base da API
-    base_url = f"https://api.z-api.io/instances/{INSTANCE_ID}/token/{TOKEN}"
+    base_url = Config.get_zapi_base_url()
     
     # Número para teste
-    TEST_NUMBER = "21936182339"
+    TEST_NUMBER = Config.get_test_number('primary')
     
     # Caminho do arquivo de áudio
-    AUDIO_PATH = "/Users/chain/Desktop/miniapp/API-clint/poema.mp3"
+    AUDIO_PATH = Config.AUDIO_TEST_PATH or "/Users/chain/Desktop/miniapp/API-clint/poema.mp3"
     
     try:
         # Verifica se o arquivo existe
@@ -48,7 +46,7 @@ def main():
         
         # Headers da requisição
         headers = {
-            "Client-Token": SECURITY_TOKEN,
+            "Client-Token": Config.ZAPI_SECURITY_TOKEN,
             "Content-Type": "application/json"
         }
         

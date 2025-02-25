@@ -21,9 +21,28 @@ class Config:
     # WhatsApp Numbers
     ZAPI_SENDER_NUMBER: str = os.getenv('ZAPI_SENDER_NUMBER', '')  # Número que envia as mensagens
     DEFAULT_CLIENT_NUMBER: str = os.getenv('DEFAULT_CLIENT_NUMBER', '')  # Número padrão do cliente
+    TEST_NUMBERS: dict = {
+        'primary': os.getenv('TEST_NUMBER_PRIMARY', ''),
+        'secondary': os.getenv('TEST_NUMBER_SECONDARY', '')
+    }
     
     # Ngrok
     NGROK_AUTHTOKEN: str = os.getenv('NGROK_AUTHTOKEN', '')
+    
+    # Webhook
+    WEBHOOK_BASE_URL: str = os.getenv('WEBHOOK_BASE_URL', '')
+    WEBHOOK_PORT: int = int(os.getenv('WEBHOOK_PORT', '8000'))
+    
+    # Caminhos de arquivos
+    AUDIO_TEST_PATH: str = os.getenv('AUDIO_TEST_PATH', '')
+    
+    # URLs de mídia para testes
+    MEDIA_URLS = {
+        'audio': os.getenv('TEST_AUDIO_URL', 'https://freetestdata.com/wp-content/uploads/2021/09/Free_Test_Data_100KB_MP3.mp3'),
+        'video': os.getenv('TEST_VIDEO_URL', 'https://www.learningcontainer.com/wp-content/uploads/2020/05/sample-mp4-file.mp4'),
+        'image': os.getenv('TEST_IMAGE_URL', 'https://www.learningcontainer.com/wp-content/uploads/2020/07/Sample-JPEG-Image-File-Download-scaled.jpg'),
+        'document': os.getenv('TEST_DOCUMENT_URL', 'https://www.learningcontainer.com/wp-content/uploads/2019/09/sample-pdf-file.pdf')
+    }
     
     @classmethod
     def validate(cls) -> Optional[str]:
@@ -64,4 +83,9 @@ class Config:
     @classmethod
     def get_zapi_base_url(cls) -> str:
         """Retorna a URL base do Z-API"""
-        return f"https://api.z-api.io/instances/{cls.ZAPI_INSTANCE_ID}/token/{cls.ZAPI_TOKEN}" 
+        return f"https://api.z-api.io/instances/{cls.ZAPI_INSTANCE_ID}/token/{cls.ZAPI_TOKEN}"
+    
+    @classmethod 
+    def get_test_number(cls, key: str = 'primary') -> str:
+        """Retorna um número de teste"""
+        return cls.TEST_NUMBERS.get(key, cls.TEST_NUMBERS.get('primary', '')) 
