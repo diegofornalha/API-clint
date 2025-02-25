@@ -2,6 +2,46 @@
 
 Cliente Python para integração com a [API Clint](https://clint-api.readme.io/reference).
 
+## Novidades
+
+### Interface Streamlit para Envio de Mensagens via WhatsApp
+
+Adicionamos uma interface gráfica usando Streamlit para facilitar o envio de mensagens e áudios via WhatsApp utilizando a Z-API.
+
+#### Funcionalidades principais
+
+- **Interface amigável**: Fácil configuração de credenciais e visualização de resultados
+- **Envio de áudio**: Upload de arquivos nos formatos MP3, WAV, OGG
+- **Envio de texto**: Mensagens de texto simples
+- **Modos de envio**:
+  - Individual: para um único número
+  - Em massa: para múltiplos números separados por vírgula
+  - Importação de números: carregamento de lista de números a partir de arquivo de texto
+- **Configurações salvas**: Todos os parâmetros podem ser salvos em arquivo .env
+- **Validação de conexão**: Teste de conectividade com a Z-API
+
+#### Limitações atuais
+
+- A conversão de texto para áudio via gTTS está temporariamente desativada
+- Arquivos de áudio devem ser enviados diretamente no formato suportado
+
+#### Para executar a interface:
+
+```bash
+streamlit run streamlit_audio_interface.py --server.port=8502
+```
+
+Acesse: http://localhost:8502
+
+#### Formato para números no arquivo de texto
+
+Para envio em massa usando arquivo de texto, cada número deve estar em uma linha separada com formato:
+```
+5521999999999
+5511888888888
+```
+Incluindo DDI e DDD, sem caracteres especiais.
+
 ## Instalação
 
 ```bash

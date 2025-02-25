@@ -9,6 +9,8 @@ from pathlib import Path
 from datetime import datetime
 from typing import Optional, Dict, List, Any
 from dotenv import load_dotenv
+# Importando gTTS para conversão de texto para áudio
+# from gtts import gTTS  # Comentado temporariamente devido a problemas de dependência
 
 # Configuração de logging simples
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -106,6 +108,132 @@ def encode_audio_to_base64(audio_path: str) -> str:
     except Exception as e:
         logger.error(f"Erro ao codificar áudio: {str(e)}")
         return None
+
+def text_to_audio(text: str, lang: str = 'pt') -> Optional[str]:
+    """
+    Converte texto para arquivo de áudio usando gTTS
+    
+    Args:
+        text: Texto a ser convertido
+        lang: Idioma do texto (padrão: português)
+        
+    Returns:
+        Caminho do arquivo de áudio temporário ou None se falhar
+    """
+    # Versão temporária - apenas avisa que a funcionalidade está desativada
+    logger.warning("Funcionalidade de conversão de texto para áudio temporariamente desativada")
+    return None
+    
+    # Código original comentado:
+    """
+    try:
+        # Cria diretório temporário
+        temp_dir = tempfile.mkdtemp()
+        temp_file = os.path.join(temp_dir, "audio_from_text.mp3")
+        
+        # Converte texto para áudio
+        tts = gTTS(text=text, lang=lang, slow=False)
+        tts.save(temp_file)
+        
+        logger.info(f"Áudio gerado com sucesso: {temp_file}")
+        return temp_file
+    except Exception as e:
+        logger.error(f"Erro ao converter texto para áudio: {str(e)}")
+        return None
+    """
+
+def send_text(text, phone_numbers):
+    """
+    Função que processa o envio de texto simples via Z-API
+    
+    Args:
+        text: Texto a ser enviado
+        phone_numbers: Número(s) de telefone para envio (string ou lista)
+    
+    Returns:
+        Dict com resultados do envio
+    """
+    results = {}
+    
+    # Normaliza para lista de telefones
+    if isinstance(phone_numbers, str):
+        # Divide a string por vírgulas e remove espaços
+        phone_list = [p.strip() for p in phone_numbers.split(',')]
+    else:
+        phone_list = phone_numbers
+    
+    # Filtra números vazios
+    phone_list = [p for p in phone_list if p]
+    
+    if not text or not phone_list:
+        return {"status": "error", "message": "Por favor, forneça um texto e pelo menos um número de telefone."}
+    
+    try:
+        # Verifica se a configuração é válida
+        error = Config.validate()
+        if error:
+            return {"status": "error", "message": f"Erro de configuração: {error}"}
+        
+        # URL base da API
+        base_url = Config.get_zapi_base_url()
+        
+        # Headers da requisição
+        headers = {
+            "Client-Token": Config.ZAPI_SECURITY_TOKEN,
+            "Content-Type": "application/json"
+        }
+        
+        # Para cada número na lista
+        for phone in phone_list:
+            # Remove caracteres não numéricos do telefone
+            clean_phone = ''.join(filter(str.isdigit, phone))
+            
+            if not clean_phone:
+                results[phone] = {"status": "error", "message": "Número de telefone inválido"}
+                continue
+            
+            # Payload da requisição
+            payload = {
+                "phone": clean_phone,
+                "message": text
+            }
+            
+            # Envia o texto
+            logger.info(f"Enviando texto para {clean_phone}...")
+            response = requests.post(
+                f"{base_url}/send-text",
+                headers=headers,
+                json=payload
+            )
+            
+            # Verifica a resposta
+            if response.status_code == 200:
+                result = response.json()
+                results[phone] = {
+                    "status": "success",
+                    "zaapId": result.get('zaapId', ''),
+                    "messageId": result.get('messageId', '')
+                }
+            else:
+                results[phone] = {
+                    "status": "error",
+                    "message": f"Erro ao enviar texto: {response.text}"
+                }
+                
+    except Exception as e:
+        logger.error(f"Erro: {str(e)}")
+        return {"status": "error", "message": f"Erro: {str(e)}"}
+    
+    # Retorna resultados completos
+    return {
+        "status": "complete",
+        "results": results,
+        "summary": {
+            "total": len(phone_list),
+            "success": sum(1 for r in results.values() if r.get("status") == "success"),
+            "failed": sum(1 for r in results.values() if r.get("status") == "error")
+        }
+    }
 
 def send_audio(audio_file, phone_numbers):
     """
@@ -509,8 +637,8 @@ with st.sidebar:
                 st.error(result["message"])
 
 # Título e descrição principal
-st.title("🎵 Envio de Áudio via WhatsApp")
-st.subheader("Envie áudios para qualquer número do WhatsApp usando a Z-API")
+st.title("🎵 Envio de Mensagens via WhatsApp")
+st.subheader("Envie áudios ou textos para qualquer número do WhatsApp usando a Z-API")
 
 # Tabs para diferentes funcionalidades
 tab1, tab2 = st.tabs(["📱 Envio Individual", "📢 Envio em Massa"])
@@ -524,6 +652,24 @@ with tab1:
         st.subheader("Carregar arquivo de áudio")
         uploaded_file = st.file_uploader("Selecione um arquivo de áudio", type=["mp3", "wav", "ogg"], key="upload_individual")
         
+        # OU opção de texto para ser convertido em áudio
+        st.subheader("Ou escreva texto para enviar")
+        text_input = st.text_area(
+            "Digite o texto da mensagem",
+            placeholder="Digite seu texto aqui...",
+            height=100,
+            key="text_individual"
+        )
+        
+        # Checkbox para escolher se converte para áudio ou envia como texto
+        if text_input:
+            is_convert_to_audio = st.checkbox(
+                "Converter texto para mensagem de voz (áudio)",
+                value=True,
+                help="Se marcado, o texto será convertido para áudio antes de enviar. Se desmarcado, o texto será enviado como mensagem de texto simples.",
+                key="convert_individual"
+            )
+        
         # Separador
         st.divider()
         
@@ -535,22 +681,51 @@ with tab1:
         )
         
         # Botão de envio
-        if st.button("📤 Enviar Áudio", type="primary", key="send_individual"):
+        if st.button("📤 Enviar Mensagem", type="primary", key="send_individual"):
+            # Verificar se há arquivo ou texto
+            temp_file_path = None
+            text_to_send = None
+            
             if uploaded_file:
+                # Se tiver arquivo, usar ele
+                with st.spinner("Processando arquivo de áudio..."):
+                    temp_file_path = save_uploaded_file(uploaded_file)
+            elif text_input:
+                # Se tem texto, verifica se é para converter para áudio
+                if 'convert_individual' in st.session_state and st.session_state.convert_individual:
+                    # Tentativa de converter para áudio
+                    with st.spinner("Verificando possibilidade de conversão..."):
+                        temp_file_path = text_to_audio(text_input)
+                        
+                    # Como sabemos que text_to_audio retorna None agora, exibimos o aviso
+                    st.warning("⚠️ A conversão de texto para áudio está temporariamente desativada. Enviando como texto simples.")
+                    text_to_send = text_input
+                else:
+                    # Enviar como texto
+                    text_to_send = text_input
+            else:
+                st.session_state.result_individual = {"status": "error", "message": "Por favor, selecione um arquivo de áudio ou digite um texto."}
+            
+            # Se tem áudio para enviar
+            if temp_file_path and phone_number:
                 # Mostrar spinner durante o processamento
                 with st.spinner("Enviando áudio..."):
-                    # Salvar o arquivo temporariamente
-                    temp_file_path = save_uploaded_file(uploaded_file)
-                    if temp_file_path:
-                        # Enviar o áudio
-                        result = send_audio(temp_file_path, phone_number)
-                        
-                        # Mostrar o resultado em um estado de sessão para persistir entre recarregamentos
-                        st.session_state.result_individual = result
-                    else:
-                        st.session_state.result_individual = {"status": "error", "message": "Erro ao processar o arquivo de áudio."}
-            else:
-                st.session_state.result_individual = {"status": "error", "message": "Por favor, selecione um arquivo de áudio."}
+                    # Enviar o áudio
+                    result = send_audio(temp_file_path, phone_number)
+                    
+                    # Mostrar o resultado em um estado de sessão para persistir entre recarregamentos
+                    st.session_state.result_individual = result
+            # Se tem texto para enviar
+            elif text_to_send and phone_number:
+                # Mostrar spinner durante o processamento
+                with st.spinner("Enviando texto..."):
+                    # Enviar o texto
+                    result = send_text(text_to_send, phone_number)
+                    
+                    # Mostrar o resultado em um estado de sessão
+                    st.session_state.result_individual = result
+            elif (temp_file_path or text_to_send) and not phone_number:
+                st.session_state.result_individual = {"status": "error", "message": "Por favor, digite um número de telefone."}
 
     with col2:
         # Área de resultado
@@ -588,6 +763,24 @@ with tab2:
         st.subheader("Carregar arquivo de áudio")
         mass_uploaded_file = st.file_uploader("Selecione um arquivo de áudio", type=["mp3", "wav", "ogg"], key="upload_mass")
         
+        # OU opção de texto para ser convertido em áudio
+        st.subheader("Ou escreva texto para enviar")
+        mass_text_input = st.text_area(
+            "Digite o texto da mensagem",
+            placeholder="Digite seu texto aqui...",
+            height=100,
+            key="text_mass"
+        )
+        
+        # Checkbox para escolher se converte para áudio ou envia como texto
+        if mass_text_input:
+            is_convert_to_audio_mass = st.checkbox(
+                "Converter texto para mensagem de voz (áudio)",
+                value=True,
+                help="Se marcado, o texto será convertido para áudio antes de enviar. Se desmarcado, o texto será enviado como mensagem de texto simples.",
+                key="convert_mass"
+            )
+        
         # Separador
         st.divider()
         
@@ -601,24 +794,50 @@ with tab2:
         
         # Botão de envio em massa
         if st.button("📤 Enviar para Todos", type="primary", key="send_mass"):
-            if mass_uploaded_file and mass_phone_numbers:
+            # Verificar se há arquivo ou texto
+            temp_file_path = None
+            text_to_send = None
+            
+            if mass_uploaded_file:
+                # Se tiver arquivo, usar ele
+                with st.spinner("Processando arquivo de áudio..."):
+                    temp_file_path = save_uploaded_file(mass_uploaded_file)
+            elif mass_text_input:
+                # Se tem texto, verifica se é para converter para áudio
+                if 'convert_mass' in st.session_state and st.session_state.convert_mass:
+                    # Tentativa de converter para áudio
+                    with st.spinner("Verificando possibilidade de conversão..."):
+                        temp_file_path = text_to_audio(mass_text_input)
+                    
+                    # Como sabemos que text_to_audio retorna None agora, exibimos o aviso
+                    st.warning("⚠️ A conversão de texto para áudio está temporariamente desativada. Enviando como texto simples.")
+                    text_to_send = mass_text_input
+                else:
+                    # Enviar como texto
+                    text_to_send = mass_text_input
+            else:
+                st.session_state.result_mass = {"status": "error", "message": "Por favor, selecione um arquivo de áudio ou digite um texto."}
+            
+            # Se tem áudio para enviar
+            if temp_file_path and mass_phone_numbers:
                 # Mostrar spinner durante o processamento
                 with st.spinner("Enviando áudios para múltiplos destinatários..."):
-                    # Salvar o arquivo temporariamente
-                    temp_file_path = save_uploaded_file(mass_uploaded_file)
-                    if temp_file_path:
-                        # Enviar o áudio para múltiplos números
-                        result = send_audio(temp_file_path, mass_phone_numbers)
-                        
-                        # Mostrar o resultado em um estado de sessão para persistir entre recarregamentos
-                        st.session_state.result_mass = result
-                    else:
-                        st.session_state.result_mass = {"status": "error", "message": "Erro ao processar o arquivo de áudio."}
-            else:
-                if not mass_uploaded_file:
-                    st.session_state.result_mass = {"status": "error", "message": "Por favor, selecione um arquivo de áudio."}
-                else:
-                    st.session_state.result_mass = {"status": "error", "message": "Por favor, insira pelo menos um número de telefone."}
+                    # Enviar o áudio para múltiplos números
+                    result = send_audio(temp_file_path, mass_phone_numbers)
+                    
+                    # Mostrar o resultado em um estado de sessão
+                    st.session_state.result_mass = result
+            # Se tem texto para enviar
+            elif text_to_send and mass_phone_numbers:
+                # Mostrar spinner durante o processamento
+                with st.spinner("Enviando texto para múltiplos destinatários..."):
+                    # Enviar o texto para múltiplos números
+                    result = send_text(text_to_send, mass_phone_numbers)
+                    
+                    # Mostrar o resultado em um estado de sessão
+                    st.session_state.result_mass = result
+            elif (temp_file_path or text_to_send) and not mass_phone_numbers:
+                st.session_state.result_mass = {"status": "error", "message": "Por favor, insira pelo menos um número de telefone."}
     
     with col2:
         # Área de resultado para envio em massa
@@ -658,7 +877,11 @@ st.divider()
 # Informações adicionais
 with st.expander("ℹ️ Informações"):
     st.markdown("""
-    **Formatos suportados:**
+    **Opções de entrada:**
+    - **Arquivo de áudio**: Upload direto de arquivos MP3, WAV, OGG
+    - **Texto para áudio**: Digite texto que será convertido em mensagem de voz
+    
+    **Formatos suportados (para upload de áudio):**
     - MP3
     - WAV
     - OGG
